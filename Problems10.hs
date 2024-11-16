@@ -108,7 +108,7 @@ subst x m Recall = Recall
 subst x m (Throw e) = Throw (subst x m e)
 subst x m (Catch e1 y e2)
   | x == y    = Catch (subst x m e1) y e2
-  | otherwise = Catch (subst x m e1) y (subst x m e2
+  | otherwise = Catch (subst x m e1) y (subst x m e2)
 
 {-------------------------------------------------------------------------------
 
