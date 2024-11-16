@@ -202,7 +202,32 @@ bubble; this won't *just* be `Throw` and `Catch.
 -------------------------------------------------------------------------------}
 
 smallStep :: (Expr, Expr) -> Maybe (Expr, Expr)
-smallStep = undefined
+smallStep (Const , acc) = Nothing -- Terminal case for constants
+smallStep (Var , acc) = Nothing -- Terminal case for variables
+smallStep (Lam x body, acc) = Nothing -- Terminal case for lambdas
+smallStep (Plus (Const v1) (Const v2), acc) = Just (Const (v1 + v2), acc)
+smallStep (Plus m1 m2, acc)
+  | isValue m1 = fmap ((m2', acc') -> (Plus m1 m2', acc')) (smallStep (m2, acc))
+  | otherwise  = fmap ((m1', acc') -> (Plus m1' m2, acc')) (smallStep (m1, acc))
+smallStep (Store m, acc)
+  | isValue m = Just (m, m) -- Replace accumulator with m's value
+  | otherwise = fmap ((m', acc') -> (Store m', acc')) (smallStep (m, acc))
+smallStep (Recall, acc) = Just (acc, acc) -- Return current accumulator
+smallStep (Throw m, acc)
+  | isValue m = Just (Throw m, acc)
+  | otherwise = fmap ((m', acc') -> (Throw m', acc')) (smallStep (m, acc))
+smallStep (App (Lam x body) arg, acc)
+  | isValue arg = Just (subst x arg body, acc) -- Function application
+  | otherwise = fmap ((arg', acc') -> ((App (Lam x body) arg'), acc')) (smallStep (arg, acc))
+smallStep (App m1 m2, acc)
+  | isValue m1 = fmap ((m2', acc') -> (App m1 m2', acc')) (smallStep (m2, acc))
+  | otherwise = fmap ((m1', acc') -> (App m1' m2, acc')) (smallStep (m1, acc))
+smallStep (Catch m y h, acc)
+  | isValue m = Just (m, acc) -- m successfully evaluates to a value
+  | otherwise = case m of
+      Throw w -> Just (subst y w h, acc) -- Handle exception by substitution
+      _       -> fmap ((m', acc') -> (Catch m' y h, acc')) (smallStep (m, acc))
+smallStep (e, acc) = Nothing
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
