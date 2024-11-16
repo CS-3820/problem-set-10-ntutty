@@ -95,20 +95,20 @@ be replaced by the substitution?
 
 -------------------------------------------------------------------------------}
 
-substUnder :: String -> Expr -> String -> Expr -> Expr
-substUnder x m y n 
-  | x == y = n
-  | otherwise = subst x m n
-
 subst :: String -> Expr -> Expr -> Expr
-subst _ _ (Const i) = Const i
+subst   (Const i) = Const i
 subst x m (Plus n1 n2) = Plus (subst x m n1) (subst x m n2)
 subst x m (Var y) 
   | x == y = m
   | otherwise = Var y
 subst x m (Lam y n) = Lam y (substUnder x m y n)
 subst x m (App n1 n2) = App (subst x m n1) (subst x m n2)
-subst x m n = undefined
+subst x m (Store e) = Store (subst x m e)
+subst x m Recall = Recall
+subst x m (Throw e) = Throw (subst x m e)
+subst x m (Catch e1 y e2)
+  | x == y    = Catch (subst x m e1) y e2
+  | otherwise = Catch (subst x m e1) y (subst x m e2
 
 {-------------------------------------------------------------------------------
 
@@ -210,7 +210,7 @@ smallStep (Plus m1 m2, acc)
   | isValue m1 = fmap ((m2', acc') -> (Plus m1 m2', acc')) (smallStep (m2, acc))
   | otherwise  = fmap ((m1', acc') -> (Plus m1' m2, acc')) (smallStep (m1, acc))
 smallStep (Store m, acc)
-  | isValue m = Just (m, m) -- Replace accumulator with m's value
+  | isValue m = Just (Const 0, m) -- Replace accumulator with m's value
   | otherwise = fmap ((m', acc') -> (Store m', acc')) (smallStep (m, acc))
 smallStep (Recall, acc) = Just (acc, acc) -- Return current accumulator
 smallStep (Throw m, acc)
@@ -227,7 +227,7 @@ smallStep (Catch m y h, acc)
   | otherwise = case m of
       Throw w -> Just (subst y w h, acc) -- Handle exception by substitution
       _       -> fmap ((m', acc') -> (Catch m' y h, acc')) (smallStep (m, acc))
-smallStep (e, acc) = Nothing
+smallStep (e, acc) = Nothing -- Fallback case
 
 steps :: (Expr, Expr) -> [(Expr, Expr)]
 steps s = case smallStep s of
